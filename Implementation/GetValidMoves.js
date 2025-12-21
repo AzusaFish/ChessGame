@@ -1,8 +1,6 @@
 const {canCapture}=require('./CanCapture.js');
 
-let validMoveTo=[];
-
-function rookLikeMoves(fromRow,fromCol,board,who)
+function rookLikeMoves(fromRow,fromCol,board,who,validMoveTo)
 {
     //Up
     for(let r=fromRow-1;r>=0;r--)
@@ -71,7 +69,7 @@ function rookLikeMoves(fromRow,fromCol,board,who)
     return;
 }
 
-function bishopLikeMoves(fromRow,fromCol,board,who)
+function bishopLikeMoves(fromRow,fromCol,board,who,validMoveTo)
 {
     //Top-Left
     for(let r=fromRow-1,c=fromCol-1;r>=0&&c>=0;r--,c--)
@@ -141,7 +139,7 @@ function bishopLikeMoves(fromRow,fromCol,board,who)
 
 function getValidMoves_NoKing(Row,Col,piece,board,who)
 {
-    validMoveTo=[];
+    let validMoveTo=[];
     switch (piece.toUpperCase())
     {
         case 'P':
@@ -170,7 +168,7 @@ function getValidMoves_NoKing(Row,Col,piece,board,who)
             }
         case 'R':
             {
-                rookLikeMoves(Row,Col,board,who);
+                rookLikeMoves(Row,Col,board,who,validMoveTo);
                 return validMoveTo;
             }
         case 'N':
@@ -192,13 +190,13 @@ function getValidMoves_NoKing(Row,Col,piece,board,who)
             }
         case 'B':
             {
-                bishopLikeMoves(Row,Col,board,who);
+                bishopLikeMoves(Row,Col,board,who,validMoveTo);
                 return validMoveTo;
             }
         case 'Q':
             {
-                rookLikeMoves(Row,Col,board,who);
-                bishopLikeMoves(Row,Col,board,who);
+                rookLikeMoves(Row,Col,board,who,validMoveTo);
+                bishopLikeMoves(Row,Col,board,who,validMoveTo);
                 return validMoveTo;
             }
     }

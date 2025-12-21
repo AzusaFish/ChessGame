@@ -2,13 +2,13 @@ const color=require('./Color.js').color;
 
 function isSquareAttacked(board,who,row,col)
 {
-    const opponent=(who==='White')?'Black':'White';
     for(let r=0;r<8;r++)
     {
         for(let c=0;c<8;c++)
         {
             const piece=board[r][c];
-            if(piece&&color(piece)===opponent)
+
+            if(piece&&color(piece)===who)
             {
                 let validMoves=[];
                 if(piece.toUpperCase()==='K') 
@@ -29,7 +29,8 @@ function isSquareAttacked(board,who,row,col)
                     if(piece.toUpperCase()!=='P')
                     {
                         const getValidMoves_NoKing=require('./GetValidMoves.js').getValidMoves_NoKing;
-                        let _validMoves=getValidMoves_NoKing(r,c,piece,board,opponent);
+
+                        let _validMoves=getValidMoves_NoKing(r,c,piece,board,who);
                         for(const move of _validMoves)
                         {
                             validMoves.push(move);
@@ -37,7 +38,7 @@ function isSquareAttacked(board,who,row,col)
                     }
                     else
                     {
-                        let direction=(opponent==='White')?-1:1;
+                        let direction=(who==='White')?-1:1;
                         if(c-1>=0)
                         {
                             validMoves.push([r+direction,c-1]);
