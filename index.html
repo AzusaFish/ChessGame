@@ -6,6 +6,20 @@
     <title>Chess</title>
     <link rel="stylesheet" href="style.css" />
   </head>
+  <!-- Promotion-->
+  <div id="promotion-modal" class="promotion-modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="promotion-backdrop"></div>
+    <div class="promotion-box" role="document" aria-label="Choose promotion">
+      <div class="promotion-title">Choose promotion</div>
+      <div class="promotion-options">
+        <button class="promo-btn" data-piece="Q" aria-label="Queen">♕</button>
+        <button class="promo-btn" data-piece="R" aria-label="Rook">♖</button>
+        <button class="promo-btn" data-piece="B" aria-label="Bishop">♗</button>
+        <button class="promo-btn" data-piece="N" aria-label="Knight">♘</button>
+      </div>
+    </div>
+  </div>
+  
   <body>
     <div id="game-container">
       <div id="chessboard"></div>

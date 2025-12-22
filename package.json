@@ -1,6 +1,6 @@
 {
   "name": "chessgame",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "",
   "main": "main.js",
   "scripts": {
@@ -20,14 +20,22 @@
     "appId": "com.AzusaFish.chessgame",
     "productName": "ChessGame",
     "files": [
-      "**/*"
+      "**/*",
+      "!**/*.cpp",
+      "!**/*.h",
+      "!**/*.o",
+      "!stockfish/**"
+    ],
+    "extraResources": [
+      "Bridge.exe",
+      "stockfish-windows-x86-64-avx2.exe"
     ],
     "directories": {
-      "buildResources": "build"
+      "buildResources": "Build"
     },
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "Build/icon.ico"
     }
   }
 }

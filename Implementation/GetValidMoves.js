@@ -137,7 +137,7 @@ function bishopLikeMoves(fromRow,fromCol,board,who,validMoveTo)
     }
 }
 
-function getValidMoves_NoKing(Row,Col,piece,board,who)
+function getValidMoves_NoKing(Row,Col,piece,board,who,enPassantTarget=[])
 {
     let validMoveTo=[];
     switch (piece.toUpperCase())
@@ -152,6 +152,17 @@ function getValidMoves_NoKing(Row,Col,piece,board,who)
                 if(canCapture(Row+direction,Col+1,board,who))
                 {
                     validMoveTo.push([Row+direction,Col+1]);
+                }
+                // En Passant
+                if(enPassantTarget.length>0)
+                {
+                    for(let i=0;i<enPassantTarget.length;i++)
+                    {
+                        if(Math.abs(enPassantTarget[i][1]-Col)===1&&enPassantTarget[i][0]===Row&&enPassantTarget[i][2]!==who)
+                        {
+                            validMoveTo.push([Row+direction,enPassantTarget[i][1],'enPassant']);
+                        }
+                    }
                 }
                 if(board[Row+direction][Col]===null)
                 {

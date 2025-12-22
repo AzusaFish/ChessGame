@@ -1,3 +1,5 @@
+"use strict";
+
 const showMoves=require('./Implementation/ShowMoves.js').showMoves;
 const clearMoves=require('./Implementation/ShowMoves.js').clearMoves;
 const canCapture=require('./Implementation/CanCapture.js').canCapture;
@@ -9,6 +11,8 @@ const inCheck=require('./Implementation/InCheck.js').inCheck;
 const avoidCheck=require('./Implementation/AvoidCheck.js').avoidCheck;
 const getKingPosition=require('./Implementation/GetKingPosition.js').getKingPosition;
 const checkGameResult=require('./Implementation/CheckGameResult.js').checkGameResult;
+const canPromote=require('./Implementation/CanPromote.js').canPromote;
+const selectPromotion=require('./Implementation/PromotionSelect.js').showPromotionModal;
 
 let Board=
 [
@@ -30,6 +34,8 @@ let history=[];
 let blackInCheck=false;
 let whiteInCheck=false;
 let isGameOver=false;
+let isPromoting=false;
+let enPassantTarget=[];
 
 // UI Elements
 const turnIndicator=document.getElementById('turn-indicator');
@@ -39,7 +45,7 @@ const restartBtn=document.getElementById('restart-btn');
 function updateStatus() 
 {
     turnIndicator.textContent=turn;
-    //turnIndicator.style.color=turn==='White'?'#333':'#709edd'; // Optional color coding
+
     if(Board[0][0]!=='r') castleRights.bQ=false;
     if(Board[0][7]!=='r') castleRights.bK=false;
     if(Board[7][0]!=='R') castleRights.wQ=false;
@@ -76,6 +82,7 @@ function restartGame()
     blackInCheck=false;
     whiteInCheck=false;
     isGameOver=false;
+    enPassantTarget=[];
     
     movesList.innerHTML='';
     updateStatus();
@@ -87,9 +94,9 @@ restartBtn.addEventListener('click', restartGame);
 
 let selectedSquare=null;
 
-function clickSquare(row,col,squareElement)
-{
-    if(isGameOver) return;
+async function clickSquare(row,col,squareElement)
+{ 
+    if(isGameOver||isPromoting) return;
 
     let validMoveTo=[];
     if(!selectedSquare)
@@ -107,7 +114,7 @@ function clickSquare(row,col,squareElement)
             }
             else
             {
-                validMoveTo=getValidMoves_NoKing(row,col,piece,Board,color(piece));
+                validMoveTo=getValidMoves_NoKing(row,col,piece,Board,color(piece),enPassantTarget);
                 validMoveTo=avoidCheck(validMoveTo,Board,color(piece),selectedSquare,piece);
             }
             showMoves(validMoveTo);
@@ -124,6 +131,14 @@ function clickSquare(row,col,squareElement)
     }
 
     const movingPiece=Board[selectedSquare.row][selectedSquare.col];
+
+    if(!movingPiece)
+    {
+        selectedSquare=null;
+        clearMoves();
+        return;
+    }
+
     if(movingPiece.toUpperCase()==='K')
     {
         validMoveTo=getValidKingMoves(selectedSquare.row,selectedSquare.col,movingPiece,Board,color(movingPiece),castleRights);
@@ -131,13 +146,25 @@ function clickSquare(row,col,squareElement)
     }
     else
     {
-        validMoveTo=getValidMoves_NoKing(selectedSquare.row,selectedSquare.col,movingPiece,Board,color(movingPiece));
+        validMoveTo=getValidMoves_NoKing(selectedSquare.row,selectedSquare.col,movingPiece,Board,color(movingPiece),enPassantTarget);
         validMoveTo=avoidCheck(validMoveTo,Board,color(movingPiece),selectedSquare,movingPiece);
     }
     
     let isValid=false;
     let shortCastle=false;
     let longCastle=false;
+    let enPassant=false;
+
+    //clear enPassantTarget after each move
+    for(let i=0;i<enPassantTarget.length;i++)
+    {
+        if(enPassantTarget[i][2]===turn)
+        {
+            enPassantTarget.splice(i,1);
+            i--;
+        }
+    }
+
     for(const move of validMoveTo)
     {
         if(move[0]===row&&move[1]===col)
@@ -147,6 +174,7 @@ function clickSquare(row,col,squareElement)
             {
                 if(move[2]==='O-O') shortCastle=true;
                 if(move[2]==='O-O-O') longCastle=true;
+                if(move[2]==='enPassant') enPassant=true;
             }
             break;
         }
@@ -181,13 +209,50 @@ function clickSquare(row,col,squareElement)
             Board[row][0]=null;
             history.push({longCastle:true});
         }
-        else
+        else if(enPassant)
         {
-            addMoveToHistory(selectedSquare.row, selectedSquare.col, row, col, movingPiece);
             Board[row][col]=movingPiece;
             Board[selectedSquare.row][selectedSquare.col]=null;
+            // Remove the captured pawn
+            let direction=(color(movingPiece)==='White')?1:-1;
+            Board[row+direction][col]=null;
+            addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece);
             history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece});
         }
+        else
+        {         
+            Board[row][col]=movingPiece;
+            Board[selectedSquare.row][selectedSquare.col]=null;
+
+            if(movingPiece.toUpperCase()==='P')
+            {
+                let promotion=canPromote(Board,color(movingPiece));
+                if(promotion.canPromote)
+                {
+                    isPromoting=true;
+                    const promoteChoice=await selectPromotion(promotion.color);
+                    isPromoting=false;
+                    Board[promotion.row][promotion.col]=promoteChoice;
+                    history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece,promoteChoice:promoteChoice});
+                    addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece,promoteChoice);
+                }
+                else
+                {
+                    if(Math.abs(row-selectedSquare.row)===2)
+                    {
+                        enPassantTarget.push([row,col,color(movingPiece)]);
+                    }
+                    addMoveToHistory(selectedSquare.row, selectedSquare.col, row, col, movingPiece);
+                    history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece});
+                }
+            }
+            else
+            {
+                addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece);
+                history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece});
+            }
+        }
+        
         blackInCheck=inCheck(Board,'Black');
         whiteInCheck=inCheck(Board,'White');
 

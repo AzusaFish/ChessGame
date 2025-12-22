@@ -11,6 +11,11 @@ function avoidCheck(validMoveTo,Board,who,selectedSquare,movingPiece)
         let tempBoard=JSON.parse(JSON.stringify(Board));
         tempBoard[move[0]][move[1]]=movingPiece;
         tempBoard[selectedSquare.row][selectedSquare.col]=null;
+
+        if (move.length>2&&move[2]==='enPassant') 
+        {
+            tempBoard[selectedSquare.row][move[1]] = null;
+        }
         
         if(inCheck(tempBoard,who))
         {

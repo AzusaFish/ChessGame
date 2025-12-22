@@ -163,8 +163,6 @@ private:
 };
 
 int main() {
-    // 1) 改成你的 stockfish.exe 实际路径（建议用绝对路径）
-    // 例如：L"D:\\Tools\\stockfish\\stockfish-windows-x86-64-avx2.exe"
     std::wstring stockfishPath = L"D:\\Arthur\\Codes\\Code\\New\\Developments\\ChessGame\\stockfish-windows-x86-64-avx2.exe";
 
     StockfishUCI engine;

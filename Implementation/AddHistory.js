@@ -5,7 +5,7 @@ function getAlgebraicNotation(row, col)
     return `${files[col]}${rank}`;
 }
 
-function addMoveToHistory(fromRow, fromCol, toRow, toCol, piece) 
+function addMoveToHistory(fromRow, fromCol, toRow, toCol, piece, promoteChoice = null) 
 {
     if(piece==="O-O"||piece==="O-O-O")
     {
@@ -31,7 +31,7 @@ function addMoveToHistory(fromRow, fromCol, toRow, toCol, piece)
     const from=getAlgebraicNotation(fromRow, fromCol);
     const to=getAlgebraicNotation(toRow, toCol);
     const pieceSymbol=piece.toUpperCase()==='P'?'':piece.toUpperCase(); // Pawn usually omitted
-    const moveText=`${pieceSymbol} ${from}->${to}`;
+    const moveText=promoteChoice ? `${pieceSymbol} ${from}->${to}=${promoteChoice.toUpperCase()}` : `${pieceSymbol} ${from}->${to}`;
     
     const li=document.createElement('li');
     li.textContent=`${history.length}. ${moveText}`;
