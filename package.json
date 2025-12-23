@@ -36,6 +36,14 @@
     "win": {
       "target": "nsis",
       "icon": "Build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "ChessGame",
+      "menuCategory": "ChessGame"
     }
   }
 }

@@ -1,25 +1,52 @@
 const spawn=require('child_process').spawn;
 const path=require('path');
 const fs=require('fs');
+const os=require('os');
+
+function getEngineLogPath()
+{
+    const baseDir = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    const dir = path.join(baseDir, 'ChessGame');
+    try { fs.mkdirSync(dir, { recursive: true }); } catch(_) {}
+    return path.join(dir, 'engine.log');
+}
+
+function logEngine(message)
+{
+    const line = `[${new Date().toISOString()}] ${message}\n`;
+    try { fs.appendFileSync(getEngineLogPath(), line, 'utf8'); } catch(_) {}
+    console.log(message);
+}
 
 // Determine the directory containing Bridge.exe
 let bridgeDir;
-const prodBridgePath = path.join(process.resourcesPath, 'Bridge.exe');
+const prodBridgePath = path.join(process.resourcesPath || '', 'Bridge.exe');
 
-if (fs.existsSync(prodBridgePath)) {
+if (process.resourcesPath && fs.existsSync(prodBridgePath))
+{
     // Production: Bridge.exe is in the resources folder
     bridgeDir = process.resourcesPath;
-} else {
+}
+else
+{
     // Development: Bridge.exe is in the project root (parent of Implementation/)
     bridgeDir = path.join(__dirname, '..');
 }
 
-const bridgePath='Bridge.exe';
-const bridgeProcess=spawn(bridgePath,[],{cwd:bridgeDir});
+const bridgeExePath = path.join(bridgeDir, 'Bridge.exe');
+logEngine(`Engine: using bridgeDir=${bridgeDir}`);
+logEngine(`Engine: using bridgeExePath=${bridgeExePath}`);
+
+const bridgeProcess=spawn(bridgeExePath,[],{cwd:bridgeDir, windowsHide:true});
 
 bridgeProcess.on('error',(err)=>
 {
-    console.error('Failed to start Bridge process:',err);
+    logEngine(`Engine ERROR: Failed to start Bridge process: ${err && err.stack ? err.stack : String(err)}`);
+});
+
+bridgeProcess.on('exit', (code, signal) =>
+{
+    logEngine(`Engine: Bridge process exited code=${code} signal=${signal}`);
 });
 
 let engineResolve=null;
@@ -27,7 +54,7 @@ let engineResolve=null;
 bridgeProcess.stdout.on('data',(data)=>
 {
     const output=data.toString();
-    console.log('Engine output:', output);
+    logEngine(`Engine stdout: ${output}`);
 
     const lines=output.split('\n');
     for(const line of lines)
@@ -45,13 +72,35 @@ bridgeProcess.stdout.on('data',(data)=>
     }
 });
 
+bridgeProcess.stderr.on('data', (data) =>
+{
+    logEngine(`Engine stderr: ${data.toString()}`);
+});
+
 function getBestMove(fen,timeOut)
 {
     return new Promise((resolve,reject)=>
     {
-        engineResolve=resolve;
+        if(engineResolve)
+        {
+            reject(new Error('Engine busy: previous request still pending'));
+            return;
+        }
 
-        bridgeProcess.stdin.write(`bestmove ${timeOut} ${fen}\n`);
+        engineResolve=resolve;
+        const cmd = `bestmove ${timeOut} ${fen}\n`;
+        logEngine(`Engine stdin: ${cmd.trim()}`);
+        bridgeProcess.stdin.write(cmd);
+
+        const guardMs = Math.max(3000, Number(timeOut || 0) + 5000);
+        setTimeout(() =>
+        {
+            if(engineResolve === resolve)
+            {
+                engineResolve = null;
+                reject(new Error(`Engine timeout after ${guardMs}ms`));
+            }
+        }, guardMs);
     });
 }
 
