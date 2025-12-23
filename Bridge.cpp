@@ -12,6 +12,13 @@ static std::string trimCR(std::string s) {
     return s;
 }
 
+static std::wstring getExecutableDir() {
+    wchar_t buffer[MAX_PATH];
+    GetModuleFileNameW(NULL, buffer, MAX_PATH);
+    std::wstring path(buffer);
+    return path.substr(0, path.find_last_of(L"\\/"));
+}
+
 class StockfishUCI {
 public:
     bool start(const std::wstring& stockfishExePath) {
@@ -163,7 +170,7 @@ private:
 };
 
 int main() {
-    std::wstring stockfishPath = L"D:\\Arthur\\Codes\\Code\\New\\Developments\\ChessGame\\stockfish-windows-x86-64-avx2.exe";
+    std::wstring stockfishPath = getExecutableDir() + L"\\stockfish-windows-x86-64-avx2.exe";
 
     StockfishUCI engine;
     if (!engine.start(stockfishPath)) {

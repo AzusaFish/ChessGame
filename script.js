@@ -13,6 +13,11 @@ const getKingPosition=require('./Implementation/GetKingPosition.js').getKingPosi
 const checkGameResult=require('./Implementation/CheckGameResult.js').checkGameResult;
 const canPromote=require('./Implementation/CanPromote.js').canPromote;
 const selectPromotion=require('./Implementation/PromotionSelect.js').showPromotionModal;
+const createFEN=require('./Implementation/CreateFEN.js').createFEN;
+const getBestMove=require('./Implementation/Engine.js').getBestMove;
+const UCItoMove=require('./Implementation/Engine.js').UCItoMove;
+const sleep=require('./Implementation/Sleep.js').sleep;
+
 
 let Board=
 [
@@ -36,6 +41,9 @@ let whiteInCheck=false;
 let isGameOver=false;
 let isPromoting=false;
 let enPassantTarget=[];
+let mode="PvC"; // Possible modes: PvP, PvC
+let playerSide=Math.random()<0.5?"White":"Black"; // Possible sides: White, Black
+let diff=1; // Difficulty level for computer
 
 // UI Elements
 const turnIndicator=document.getElementById('turn-indicator');
@@ -83,19 +91,85 @@ function restartGame()
     whiteInCheck=false;
     isGameOver=false;
     enPassantTarget=[];
+    mode="PvC";
+    //playerSide=Math.random()<0.5?"White":"Black";
+    playerSide=Math.random()<0.5?"White":"Black";
+    diff=2;
     
     movesList.innerHTML='';
     updateStatus();
-    createBoard(Board,clickSquare);
+    createBoard(Board,clickSquare,playerSide);
     updateCheckVisuals();
+
+    if(mode==="PvC" && turn!==playerSide)
+    {
+        computerMove();
+    }
 }
 
 restartBtn.addEventListener('click', restartGame);
 
+async function getBestMoveWithDifficulty(fen,difficulty)
+{
+    const thinkTime=Math.floor((Math.random()+difficulty/10)*difficulty*100);
+    const startTime=Date.now();
+    const move=await getBestMove(fen,thinkTime);
+    const elapsed=Date.now()-startTime;
+    await sleep(Math.max(0,Math.floor((Math.random()/2+0.5)*1500)-elapsed));
+    return move;
+}
+
+async function computerMove()
+{
+    const fen=createFEN(Board,turn,castleRights,enPassantTarget,Math.floor(history.length/2)+1,history.length+1);
+    const bestMove=await getBestMoveWithDifficulty(fen,diff);
+    console.log("Computer's best move (UCI): ",bestMove);
+
+    if(!bestMove||bestMove==="null"||bestMove==="(none)")
+    {
+        console.log("No valid moves from computer.");
+        return;
+    }
+
+    const move=UCItoMove(bestMove);
+    if(move)
+    {
+        const fromRow=move.from.row;
+        const fromCol=move.from.col;
+        const toRow=move.to.row;
+        const toCol=move.to.col;
+        
+        const squareElement=document.querySelector(`[data-row='${fromRow}'][data-col='${fromCol}']`);
+        await clickSquare(fromRow,fromCol,squareElement,true);
+        const targetElement=document.querySelector(`[data-row='${toRow}'][data-col='${toCol}']`);
+        await clickSquare(toRow,toCol,targetElement,true);
+    }
+
+    const result=checkGameResult(Board,turn,blackInCheck,whiteInCheck,castleRights);
+    if(result==='Checkmate')
+    {
+        addMoveToHistory(-1,-1,-1,-1,"Checkmate");
+        setTimeout(() => {
+        alert(`Checkmate! ${turn==='White'?'Black':'White'} wins.`)},100);
+        isGameOver=true;
+    }
+    if(result==='Stalemate')
+    {
+        addMoveToHistory(-1,-1,-1,-1,"Stalemate");
+        setTimeout(() => {
+        alert("Stalemate! Draw.")},100);
+        isGameOver=true;
+    }
+}
+
 let selectedSquare=null;
 
-async function clickSquare(row,col,squareElement)
+async function clickSquare(row,col,squareElement,isComputer=false)
 { 
+    if(turn!==playerSide&&!isComputer)
+    {
+        return;
+    }
     if(isGameOver||isPromoting) return;
 
     let validMoveTo=[];
@@ -259,13 +333,12 @@ async function clickSquare(row,col,squareElement)
         turn=(turn==='White')?'Black':'White';
         updateStatus();
 
-        createBoard(Board,clickSquare);
+        createBoard(Board,clickSquare,playerSide);
         updateCheckVisuals();
         selectedSquare=null;
         clearMoves();
 
         const result=checkGameResult(Board,turn,blackInCheck,whiteInCheck,castleRights);
-        console.log(`Game result check: ${result}`);
         if(result==='Checkmate')
         {
             addMoveToHistory(-1,-1,-1,-1,"Checkmate");
@@ -280,6 +353,11 @@ async function clickSquare(row,col,squareElement)
             alert("Stalemate! Draw.")},100);
             isGameOver=true;
         }
+
+        if(!isGameOver&&turn!==playerSide)
+        {
+            await computerMove();
+        }
     }
     else
     {
@@ -293,10 +371,8 @@ async function clickSquare(row,col,squareElement)
 
 function updateCheckVisuals()
 {
-    console.log("Running updateCheckVisuals...");
     blackInCheck=inCheck(Board,'Black');
     whiteInCheck=inCheck(Board,'White');
-    console.log(`Check status - Black: ${blackInCheck}, White: ${whiteInCheck}`);
 
     // Remove existing check highlights
     document.querySelectorAll('.square.in-check').forEach(elem=>elem.classList.remove('in-check'));
@@ -315,20 +391,20 @@ function updateCheckVisuals()
 
     if(kingPos)
     {
-        console.log(`King found at [${kingPos[0]}, ${kingPos[1]}]`);
         const selector = `[data-row='${kingPos[0]}'][data-col='${kingPos[1]}']`;
         const selectedSquareElement=document.querySelector(selector);
         if(selectedSquareElement) 
         {
             selectedSquareElement.classList.add('in-check');
-            console.log(`Added .in-check to square [${kingPos[0]}, ${kingPos[1]}]`);
-        }
-        else
-        {
-            console.error(`Could not find square with selector: ${selector}`);
         }
     }
 }
 
-createBoard(Board,clickSquare);
+playerSide=Math.random()<0.5?"White":"Black";
+createBoard(Board,clickSquare,playerSide);
 updateCheckVisuals();
+
+if(mode==="PvC" && turn!==playerSide)
+{
+    computerMove();
+}
