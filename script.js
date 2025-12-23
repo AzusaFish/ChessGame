@@ -17,7 +17,8 @@ const createFEN=require('./Implementation/CreateFEN.js').createFEN;
 const getBestMove=require('./Implementation/Engine.js').getBestMove;
 const UCItoMove=require('./Implementation/Engine.js').UCItoMove;
 const sleep=require('./Implementation/Sleep.js').sleep;
-
+const checkThreeRepeated=require('./Implementation/CheckThreeRepeated.js').checkThreeRepeated;
+const createFENForRecords=require('./Implementation/FENForRecords.js').createFENForRecords;
 
 let Board=
 [
@@ -45,6 +46,8 @@ let mode="PvC"; // Possible modes: PvP, PvC
 let playerSide=Math.random()<0.5?"White":"Black"; // Possible sides: White, Black
 let diff=1; // Difficulty level for computer
 
+const FENrecords=new Map();
+
 // UI Elements
 const turnIndicator=document.getElementById('turn-indicator');
 const movesList=document.getElementById('moves-list');
@@ -67,6 +70,19 @@ function updateStatus()
     {
         castleRights.wK=false;
         castleRights.wQ=false;
+    }
+}
+
+function checkThreeFold()
+{
+    const fen=createFENForRecords(Board,turn,castleRights,enPassantTarget,Math.floor(history.length/2)+1,history.length+1);
+    FENrecords[fen]=(FENrecords[fen]||0)+1;
+    if(checkThreeRepeated(FENrecords))
+    {
+        addMoveToHistory(-1,-1,-1,-1,"Threefold repetition");
+        setTimeout(()=>{ alert("Draw by threefold repetition."); }, 100);
+        isGameOver = true;
+        return;        
     }
 }
 
@@ -94,12 +110,14 @@ function restartGame()
     mode="PvC";
     //playerSide=Math.random()<0.5?"White":"Black";
     playerSide=Math.random()<0.5?"White":"Black";
-    diff=2;
+    diff=1;
+    FENrecords.clear();
     
     movesList.innerHTML='';
     updateStatus();
     createBoard(Board,clickSquare,playerSide);
     updateCheckVisuals();
+    checkThreeFold();
 
     if(mode==="PvC" && turn!==playerSide)
     {
@@ -111,11 +129,44 @@ restartBtn.addEventListener('click', restartGame);
 
 async function getBestMoveWithDifficulty(fen,difficulty)
 {
-    const thinkTime=Math.floor((Math.random()+difficulty/10)*difficulty*100);
+    let thinkTime;
+    switch (difficulty)
+    {
+        case 1:
+            {
+                thinkTime=Math.floor(Math.random()*2+1);
+                break;
+            }
+        case 2:
+            {
+                thinkTime=Math.floor(Math.random()*5+10);
+                break;
+            }
+        case 3:
+            {
+                thinkTime=Math.floor(Math.random()*15+15);
+                break;
+            }
+        case 4:
+            {
+                thinkTime=Math.floor(Math.random()*30+30);
+                break;
+            }
+        case 5:
+            {
+                thinkTime=Math.floor(Math.random()*50+150);
+                break;
+            }
+        default:
+            {
+                thinkTime=Math.floor(Math.random()*80+400);
+                break;
+            }
+    }
     const startTime=Date.now();
     const move=await getBestMove(fen,thinkTime);
     const elapsed=Date.now()-startTime;
-    await sleep(Math.max(0,Math.floor((Math.random()/2+0.5)*1500)-elapsed));
+    await sleep(Math.max(0,Math.floor((Math.random()/2+0.2)*1800)-elapsed));
     return move;
 }
 
@@ -326,6 +377,8 @@ async function clickSquare(row,col,squareElement,isComputer=false)
                 history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece});
             }
         }
+
+        checkThreeFold();
         
         blackInCheck=inCheck(Board,'Black');
         whiteInCheck=inCheck(Board,'White');
@@ -403,6 +456,7 @@ function updateCheckVisuals()
 playerSide=Math.random()<0.5?"White":"Black";
 createBoard(Board,clickSquare,playerSide);
 updateCheckVisuals();
+checkThreeFold();
 
 if(mode==="PvC" && turn!==playerSide)
 {

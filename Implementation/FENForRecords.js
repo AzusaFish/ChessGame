@@ -1,4 +1,4 @@
-function createFEN(board,who,castleRights,enPassantTarget,halfRound,round)
+function createFENForRecords(board,who,castleRights,enPassantTarget,halfRound,round)
 {
     let fen='';
     let emptyCnt=0;
@@ -69,4 +69,4 @@ function createFEN(board,who,castleRights,enPassantTarget,halfRound,round)
     return fen;
 }
 
-module.exports={createFEN};
+module.exports={createFENForRecords};
