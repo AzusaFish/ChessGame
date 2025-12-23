@@ -1,8 +1,21 @@
 const spawn=require('child_process').spawn;
 const path=require('path');
+const fs=require('fs');
+
+// Determine the directory containing Bridge.exe
+let bridgeDir;
+const prodBridgePath = path.join(process.resourcesPath, 'Bridge.exe');
+
+if (fs.existsSync(prodBridgePath)) {
+    // Production: Bridge.exe is in the resources folder
+    bridgeDir = process.resourcesPath;
+} else {
+    // Development: Bridge.exe is in the project root (parent of Implementation/)
+    bridgeDir = path.join(__dirname, '..');
+}
 
 const bridgePath='Bridge.exe';
-const bridgeProcess=spawn(bridgePath,[],{cwd:path.join(__dirname,'..')});
+const bridgeProcess=spawn(bridgePath,[],{cwd:bridgeDir});
 
 bridgeProcess.on('error',(err)=>
 {
