@@ -1,24 +1,27 @@
 "use strict";
 
-const showMoves=require('./Implementation/ShowMoves.js').showMoves;
-const clearMoves=require('./Implementation/ShowMoves.js').clearMoves;
-const canCapture=require('./Implementation/CanCapture.js').canCapture;
-const getValidMoves_NoKing=require('./Implementation/GetValidMoves.js').getValidMoves_NoKing;
-const getValidKingMoves=require('./Implementation/Kingmoves.js').getValidKingMoves;
-const color=require('./Implementation/Color.js').color;
-const addMoveToHistory=require('./Implementation/AddHistory.js').addMoveToHistory;
-const inCheck=require('./Implementation/InCheck.js').inCheck;
-const avoidCheck=require('./Implementation/AvoidCheck.js').avoidCheck;
-const getKingPosition=require('./Implementation/GetKingPosition.js').getKingPosition;
-const checkGameResult=require('./Implementation/CheckGameResult.js').checkGameResult;
-const canPromote=require('./Implementation/CanPromote.js').canPromote;
-const selectPromotion=require('./Implementation/PromotionSelect.js').showPromotionModal;
-const createFEN=require('./Implementation/CreateFEN.js').createFEN;
-const getBestMove=require('./Implementation/Engine.js').getBestMove;
-const UCItoMove=require('./Implementation/Engine.js').UCItoMove;
-const sleep=require('./Implementation/Sleep.js').sleep;
-const checkThreeRepeated=require('./Implementation/CheckThreeRepeated.js').checkThreeRepeated;
-const createFENForRecords=require('./Implementation/FENForRecords.js').createFENForRecords;
+const {
+    showMoves,
+    clearMoves,
+    canCapture,
+    getValidMoves_NoKing,
+    getValidKingMoves,
+    color,
+    addMoveToHistory,
+    inCheck,
+    avoidCheck,
+    getKingPosition,
+    checkGameResult,
+    canPromote,
+    showPromotionModal: selectPromotion,
+    createFEN,
+    getBestMove,
+    UCItoMove,
+    sleep,
+    checkThreeRepeated,
+    createFENForRecords,
+    createBoard
+} = require('./Inplementation_Rules.js');
 
 let Board=
 [
@@ -32,7 +35,7 @@ let Board=
     ['R','N','B','Q','K','B','N','R'] 
 ]
 
-const{createBoard}=require('./Implementation/CreateBoard.js');
+
 
 let turn="White";
 let castleRights={wK:true,wQ:true,bK:true,bQ:true};
@@ -79,7 +82,7 @@ function checkThreeFold()
     FENrecords[fen]=(FENrecords[fen]||0)+1;
     if(checkThreeRepeated(FENrecords))
     {
-        addMoveToHistory(-1,-1,-1,-1,"Threefold repetition");
+        addMoveToHistory(-1,-1,-1,-1,"Threefold repetition", null, history.length + 1);
         setTimeout(()=>{ alert("Draw by threefold repetition."); }, 100);
         isGameOver = true;
         return;        
@@ -199,14 +202,14 @@ async function computerMove()
     const result=checkGameResult(Board,turn,blackInCheck,whiteInCheck,castleRights);
     if(result==='Checkmate')
     {
-        addMoveToHistory(-1,-1,-1,-1,"Checkmate");
+        addMoveToHistory(-1,-1,-1,-1,"Checkmate", null, history.length + 1);
         setTimeout(() => {
         alert(`Checkmate! ${turn==='White'?'Black':'White'} wins.`)},100);
         isGameOver=true;
     }
     if(result==='Stalemate')
     {
-        addMoveToHistory(-1,-1,-1,-1,"Stalemate");
+        addMoveToHistory(-1,-1,-1,-1,"Stalemate", null, history.length + 1);
         setTimeout(() => {
         alert("Stalemate! Draw.")},100);
         isGameOver=true;
@@ -314,7 +317,7 @@ async function clickSquare(row,col,squareElement,isComputer=false)
     {
         if(shortCastle)
         {
-            addMoveToHistory(-1,-1,-1,-1,"O-O");
+            addMoveToHistory(-1,-1,-1,-1,"O-O", null, history.length + 1);
             // Move king
             Board[row][col]=movingPiece;
             Board[selectedSquare.row][selectedSquare.col]=null;
@@ -325,7 +328,7 @@ async function clickSquare(row,col,squareElement,isComputer=false)
         }
         else if(longCastle)
         {
-            addMoveToHistory(-1,-1,-1,-1,"O-O-O");
+            addMoveToHistory(-1,-1,-1,-1,"O-O-O", null, history.length + 1);
             // Move king
             Board[row][col]=movingPiece;
             Board[selectedSquare.row][selectedSquare.col]=null;
@@ -341,7 +344,7 @@ async function clickSquare(row,col,squareElement,isComputer=false)
             // Remove the captured pawn
             let direction=(color(movingPiece)==='White')?1:-1;
             Board[row+direction][col]=null;
-            addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece);
+            addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece, null, history.length + 1);
             history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece});
         }
         else
@@ -359,7 +362,7 @@ async function clickSquare(row,col,squareElement,isComputer=false)
                     isPromoting=false;
                     Board[promotion.row][promotion.col]=promoteChoice;
                     history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece,promoteChoice:promoteChoice});
-                    addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece,promoteChoice);
+                    addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece,promoteChoice, history.length + 1);
                 }
                 else
                 {
@@ -367,13 +370,13 @@ async function clickSquare(row,col,squareElement,isComputer=false)
                     {
                         enPassantTarget.push([row,col,color(movingPiece)]);
                     }
-                    addMoveToHistory(selectedSquare.row, selectedSquare.col, row, col, movingPiece);
+                    addMoveToHistory(selectedSquare.row, selectedSquare.col, row, col, movingPiece, null, history.length + 1);
                     history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece});
                 }
             }
             else
             {
-                addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece);
+                addMoveToHistory(selectedSquare.row,selectedSquare.col,row,col,movingPiece, null, history.length + 1);
                 history.push({from:{row:selectedSquare.row,col:selectedSquare.col},to:{row,col},piece:movingPiece});
             }
         }
@@ -394,14 +397,14 @@ async function clickSquare(row,col,squareElement,isComputer=false)
         const result=checkGameResult(Board,turn,blackInCheck,whiteInCheck,castleRights);
         if(result==='Checkmate')
         {
-            addMoveToHistory(-1,-1,-1,-1,"Checkmate");
+            addMoveToHistory(-1,-1,-1,-1,"Checkmate", null, history.length + 1);
             setTimeout(() => {
             alert(`Checkmate! ${turn==='White'?'Black':'White'} wins.`)},100);
             isGameOver=true;
         }
         if(result==='Stalemate')
         {
-            addMoveToHistory(-1,-1,-1,-1,"Stalemate");
+            addMoveToHistory(-1,-1,-1,-1,"Stalemate", null, history.length + 1);
             setTimeout(() => {
             alert("Stalemate! Draw.")},100);
             isGameOver=true;
