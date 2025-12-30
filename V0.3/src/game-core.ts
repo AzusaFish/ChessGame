@@ -10,9 +10,7 @@ import {
     createFENForRecords,
     checkThreeRepeated,
     UCItoMove,
-    canCapture,
     getAlgebraicNotation,
-    sleep
 } from './utils/chess-rules';
 
 export type BoardType = (string | null)[][];
@@ -482,26 +480,40 @@ export class GameCore {
         ];
 
         try {
+            console.log('configureEngineStrength: preparing commands', commands, 'apiKeys=', {
+                hasSetOption: typeof api.setOption === 'function',
+                hasSendCommand: typeof api.sendCommand === 'function',
+                hasPostMessage: typeof api.postMessage === 'function'
+            });
+
             if (typeof api.setOption === 'function') {
-                // Preferred: structured setOption calls
+                console.log('configureEngineStrength: using api.setOption');
                 for (const cmd of commands) {
+                    console.log(`configureEngineStrength: setOption -> ${cmd.name} = ${cmd.value}`);
                     await api.setOption(cmd.name, cmd.value);
                 }
             } else if (typeof api.sendCommand === 'function') {
-                // Fallback: raw UCI command strings
+                console.log('configureEngineStrength: using api.sendCommand');
                 for (const cmd of commands) {
-                    await api.sendCommand(`setoption name ${cmd.name} value ${cmd.value}`);
+                    const str = `setoption name ${cmd.name} value ${cmd.value}`;
+                    console.log('configureEngineStrength: sendCommand ->', str);
+                    await api.sendCommand(str);
                 }
+                console.log('configureEngineStrength: sendCommand -> isready');
                 await api.sendCommand('isready');
             } else if (typeof api.postMessage === 'function') {
-                // stockfish.js style worker interface (string messages)
+                console.log('configureEngineStrength: using api.postMessage');
                 for (const cmd of commands) {
-                    api.postMessage(`setoption name ${cmd.name} value ${cmd.value}`);
+                    const str = `setoption name ${cmd.name} value ${cmd.value}`;
+                    console.log('configureEngineStrength: postMessage ->', str);
+                    api.postMessage(str);
                 }
+                console.log('configureEngineStrength: postMessage -> isready');
                 api.postMessage('isready');
             } else {
                 console.warn('Engine API does not expose setOption/sendCommand/postMessage; skipping ELO config.');
             }
+
             console.log(`Engine strength configured: diff=${this.diff}, UCI_Elo=${elo}`);
         } catch (err) {
             console.error('Failed to configure engine strength (ELO):', err);
