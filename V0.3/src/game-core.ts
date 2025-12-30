@@ -127,7 +127,7 @@ export class GameCore {
         
         // Randomize side if not specified and PvC
         if (this.mode === 'PvC' && !options.playerSide) {
-             this.playerSide = Math.random() < 0.5 ? 'White' : 'Black';
+            this.playerSide = Math.random() < 0.5 ? 'White' : 'Black';
         }
 
         this.reset();

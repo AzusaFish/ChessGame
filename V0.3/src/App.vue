@@ -30,7 +30,7 @@
         <div class="status-panel">
           <h2>Turn: <span :class="['turn-indicator', state.turn]">{{ state.turn }}</span></h2>
           <div v-if="state.isGameOver" class="game-over">Game Over</div>
-          <button @click="restartGame" class="restart-btn">Restart</button>
+          <button @click="restartGame" class="restart-btn" :disabled="isRestarting">Restart</button>
           <button @click="started = false" class="back-btn">Back to Menu</button>
         </div>
       </div>
@@ -94,6 +94,7 @@ const state = ref<GameState>({
 const selectedSquare = ref<{ row: number, col: number } | null>(null);
 const possibleMoves = ref<any[]>([]);
 const historyList = ref<HTMLElement | null>(null);
+const isRestarting = ref(false);
 
 onMounted(() => {
   gameCore.onUpdate((newState) => {
@@ -124,9 +125,12 @@ function startGame() {
 }
 
 function restartGame() {
+  if (isRestarting.value) return;
+  isRestarting.value = true;
+
   selectedSquare.value = null;
   possibleMoves.value = [];
-  
+
   let side: TurnType = 'White';
   if (sideOption.value === 'Random') {
     side = Math.random() < 0.5 ? 'White' : 'Black';
@@ -136,6 +140,9 @@ function restartGame() {
   actualPlayerSide.value = side;
 
   gameCore.start({ mode: mode.value, diff: diff.value, playerSide: side });
+
+  // Short debounce to avoid double clicks; session token in gameCore also prevents stale AI runs
+  setTimeout(() => { isRestarting.value = false; }, 800);
 }
 
 async function onSquareClick(row: number, col: number) {
