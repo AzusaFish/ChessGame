@@ -175,8 +175,8 @@ export function getValidMoves_NoKing(Row: number, Col: number, piece: string, bo
             {
                 const knightMoves = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]];
                 for (const move of knightMoves) {
-                    const newRow = Row + move[0];
-                    const newCol = Col + move[1];
+                    const newRow = Row + move[0]!;
+                    const newCol = Col + move[1]!;
                     if (newRow >= 0 && newRow <= 7 && newCol >= 0 && newCol <= 7) {
                         if (board[newRow]?.[newCol] === null || canCapture(newRow, newCol, board, who)) {
                             validMoveTo.push([newRow, newCol]);
@@ -210,8 +210,8 @@ export function isSquareAttacked(board: (string | null)[][], who: 'White' | 'Bla
                 if (piece.toUpperCase() === 'K') {
                     const directions = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]];
                     for (const dir of directions) {
-                        const nr = r + dir[0];
-                        const nc = c + dir[1];
+                        const nr = r + dir[0]!;
+                        const nc = c + dir[1]!;
                         if (nr >= 0 && nr <= 7 && nc >= 0 && nc <= 7) {
                             validMoves.push([nr, nc]);
                         }
@@ -256,8 +256,8 @@ export function getValidKingMoves(row: number, col: number, piece: string, board
     const opponent = (who === 'White') ? 'Black' : 'White';
 
     for (const dir of directions) {
-        const newRow = row + dir[0];
-        const newCol = col + dir[1];
+        const newRow = row + dir[0]!;
+        const newCol = col + dir[1]!;
         if (newRow >= 0 && newRow <= 7 && newCol >= 0 && newCol <= 7) {
             // Check if the square is empty or has an opponent piece (capture)
             // AND check if the square is NOT attacked by the opponent
@@ -319,7 +319,7 @@ export function inCheck(board: (string | null)[][], who: 'White' | 'Black'): boo
     const kingPos = getKingPosition(board, who);
 
     if (kingPos) {
-        return isSquareAttacked(board, opponent, kingPos[0], kingPos[1]);
+        return isSquareAttacked(board, opponent, kingPos[0] as number, kingPos[1] as number);
     }
     return false;
 }
@@ -487,13 +487,13 @@ export function UCItoMove(bestMove: string | null): { from: { row: number, col: 
     if (bestMove.length < 4) return null;
     
     const fromCol = bestMove.charCodeAt(0) - 'a'.charCodeAt(0);
-    const fromRow = 8 - parseInt(bestMove[1]);
+    const fromRow = 8 - parseInt(bestMove[1] as string);
     const toCol = bestMove.charCodeAt(2) - 'a'.charCodeAt(0);
-    const toRow = 8 - parseInt(bestMove[3]);
+    const toRow = 8 - parseInt(bestMove[3] as string);
 
     let promotion: string | null = null;
     if (bestMove.length > 4) {
-        promotion = bestMove[4];
+        promotion = bestMove[4] as string | null;
     }
     return { from: { row: fromRow, col: fromCol }, to: { row: toRow, col: toCol }, promotion: promotion };
 }

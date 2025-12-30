@@ -17,9 +17,9 @@
       <div class="form-group" v-if="mode === 'PvC'">
         <label>Side:</label>
         <select v-model="sideOption">
+          <option value="Random">Random</option>
           <option value="White">White</option>
           <option value="Black">Black</option>
-          <option value="Random">Random</option>
         </select>
       </div>
       <button @click="startGame" class="start-btn">Start Game</button>
@@ -78,7 +78,7 @@ import { gameCore, type GameState, type GameMode, type TurnType } from './game-c
 
 const mode = ref<GameMode>('PvC');
 const diff = ref(3);
-const sideOption = ref<TurnType | 'Random'>('White');
+const sideOption = ref<TurnType | 'Random'>('Random');
 const actualPlayerSide = ref<TurnType>('White');
 const started = ref(false);
 
@@ -112,7 +112,7 @@ function startGame() {
   selectedSquare.value = null;
   possibleMoves.value = [];
   
-  let side: TurnType = 'White';
+  let side: TurnType | 'Random' = 'Random'; 
   if (sideOption.value === 'Random') {
     side = Math.random() < 0.5 ? 'White' : 'Black';
   } else {

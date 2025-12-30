@@ -40,6 +40,10 @@ export class GameCore {
     isGameOver: boolean;
     blackInCheck: boolean;
     whiteInCheck: boolean;
+    // sessionId increments on reset() to invalidate pending async actions
+    sessionId: number;
+    // whether computer is currently thinking
+    private isThinking: boolean;
     
     private updateCb: (state: GameState) => void = () => { };
     private promotionCallback: ((piece: string) => void) | null = null;
@@ -57,6 +61,8 @@ export class GameCore {
         this.isGameOver = false;
         this.blackInCheck = false;
         this.whiteInCheck = false;
+        this.sessionId = 0;
+        this.isThinking = false;
         this.reset();
     }
 
@@ -80,6 +86,25 @@ export class GameCore {
         this.blackInCheck = false;
         this.whiteInCheck = false;
         this.promotionCallback = null;
+        // bump sessionId to cancel any pending async operations from previous session
+        this.sessionId++;
+        // try to interrupt any engine thinking when resetting
+        try {
+            const api = (window as any).api;
+            if (api) {
+                if (typeof api.stop === 'function') {
+                    api.stop();
+                } else if (typeof api.sendCommand === 'function') {
+                    api.sendCommand('stop');
+                    api.sendCommand('ucinewgame');
+                } else if (typeof api.postMessage === 'function') {
+                    api.postMessage('stop');
+                    api.postMessage('ucinewgame');
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to interrupt engine on reset:', e);
+        }
     }
 
     onUpdate(cb: (state: GameState) => void) {
@@ -169,10 +194,17 @@ export class GameCore {
     }
 
     async computerMove() {
+        // capture session at entry to ignore stale async tasks after reset()
+        const sessionAtStart = this.sessionId;
         if (this.isGameOver) return;
-        
+        if (this.isThinking) return; // avoid concurrent thinking jobs
+        this.isThinking = true;
+
         const fen = createFEN(this.board, this.turn, this.castleRights, this.enPassantTarget, Math.floor(this.history.length / 2) + 1, this.history.length + 1);
-        await this.configureEngineStrength();
+        try {
+            await this.configureEngineStrength();
+            // if session changed (reset called), abort this run
+            if (sessionAtStart !== this.sessionId) return;
         
         // Mock engine call or use IPC if available
         let bestMove = null;
@@ -191,6 +223,9 @@ export class GameCore {
                             callPromise,
                             new Promise<string | null>((resolve) => setTimeout(() => resolve(null), timeoutMs))
                         ]);
+
+                        // session might have changed while engine was thinking
+                        if (sessionAtStart !== this.sessionId) return;
 
                         if (!result) {
                             console.warn('Engine did not respond in time; result=null; falling back to random move');
@@ -216,8 +251,14 @@ export class GameCore {
         }
 
         const move = UCItoMove(bestMove);
-        if (move) {
-            await this.executeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.promotion || null);
+            if (move) {
+                // check session again right before performing the move
+                if (sessionAtStart !== this.sessionId) return;
+                await this.executeMove(move.from.row, move.from.col, move.to.row, move.to.col, move.promotion || null);
+            }
+        } finally {
+            // clear thinking flag unless a reset happened (reset increments sessionId and also clears thinking by new session)
+            try { this.isThinking = false; } catch (e) { /* ignore */ }
         }
     }
 
@@ -389,7 +430,12 @@ export class GameCore {
         // before the engine starts thinking. Adding a short timeout helps
         // ensure Vue has a chance to render the cleared markers.
         if (!this.isGameOver && this.mode === 'PvC' && this.turn !== this.playerSide) {
-            setTimeout(() => { void this.computerMove(); }, 30);
+            const sessionAtSchedule = this.sessionId;
+            setTimeout(() => {
+                if (this.sessionId === sessionAtSchedule) {
+                    void this.computerMove();
+                }
+            }, 30);
         }
     }
 
