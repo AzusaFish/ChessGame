@@ -315,7 +315,7 @@ export class GameCore {
             if (this.board[toRow]) this.board[toRow][toCol] = movingPiece!;
             if (this.board[fromRow]) this.board[fromRow][fromCol] = null;
             if (this.board[toRow]) {
-                this.board[toRow][5] = this.board[toRow][7];
+                this.board[toRow][5]= this.board[toRow][7] as string | null;
                 this.board[toRow][7] = null;
             }
         } else if (longCastle) {
@@ -323,14 +323,14 @@ export class GameCore {
             if (this.board[toRow]) this.board[toRow][toCol] = movingPiece!;
             if (this.board[fromRow]) this.board[fromRow][fromCol] = null;
             if (this.board[toRow]) {
-                this.board[toRow][3] = this.board[toRow][0];
+                this.board[toRow][3] = this.board[toRow][0] as string | null;
                 this.board[toRow][0] = null;
             }
         } else if (enPassant) {
             if (this.board[toRow]) this.board[toRow][toCol] = movingPiece!;
             if (this.board[fromRow]) this.board[fromRow][fromCol] = null;
             let direction = (color(movingPiece) === 'White') ? 1 : -1;
-            if (this.board[toRow + direction]) this.board[toRow + direction][toCol] = null;
+            if (this.board[toRow + direction]) this.board[toRow + direction]![toCol] = null;
             this.addHistoryRecord(fromRow, fromCol, toRow, toCol, movingPiece);
         } else {
             if (this.board[toRow]) this.board[toRow][toCol] = movingPiece!;
