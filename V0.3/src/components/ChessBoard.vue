@@ -43,6 +43,15 @@ function getSquareClass(row: number, col: number) {
     classes.push('selected');
   }
   
+  // Highlight king in check: if this square contains a king and its color is currently inCheck
+  const piece = props.board?.[row]?.[col];
+  if (piece && piece.toUpperCase() === 'K') {
+    const isKingWhite = piece === piece.toUpperCase();
+    if ((isKingWhite && props.inCheck?.White) || (!isKingWhite && props.inCheck?.Black)) {
+      classes.push('in-check');
+    }
+  }
+  
   return classes.join(' ');
 }
 
@@ -84,6 +93,17 @@ function isPossibleMove(row: number, col: number) {
 
 .square.selected {
   background-color: #f6f669;
+}
+
+.square.in-check {
+  box-shadow: 0 0 0 4px rgba(255, 0, 0, 0.25) inset, 0 0 18px 6px rgba(255, 0, 0, 0.35);
+  animation: check-pulse 1s ease-in-out infinite;
+}
+
+@keyframes check-pulse {
+  0% { box-shadow: 0 0 0 2px rgba(238, 23, 23, 0.12) inset, 0 0 8px 2px rgba(239, 28, 28, 0.12); }
+  50% { box-shadow: 0 0 0 6px rgba(255,0,0,0.22) inset, 0 0 20px 8px rgba(255,0,0,0.32); }
+  100% { box-shadow: 0 0 0 2px rgba(255,0,0,0.12) inset, 0 0 8px 2px rgba(255,0,0,0.12); }
 }
 
 .piece {

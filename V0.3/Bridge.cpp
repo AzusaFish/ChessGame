@@ -100,6 +100,10 @@ public:
         buffer_.clear();
     }
 
+    void sendCommand(const std::string& cmd) {
+        sendLine(cmd);
+    }
+
     std::string bestMoveFromFEN(const std::string& fen, int movetimeMs) {
         // New game helps avoid weird state
         sendLine("ucinewgame");
@@ -202,6 +206,11 @@ int main() {
 
             std::string bm = engine.bestMoveFromFEN(fen, ms);
             std::cout << "bestmove " << bm << "\n" << std::flush;
+        } else if (line.rfind("setoption ", 0) == 0) {
+            engine.sendCommand(line);
+            // No output needed for setoption, or maybe just ack?
+            // But electron-main might not be listening for ack.
+            // Let's just do it silently or log to stderr if needed.
         } else {
             // ignore unknown
             std::cout << "err unknown_command\n" << std::flush;

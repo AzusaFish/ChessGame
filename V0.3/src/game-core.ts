@@ -172,77 +172,40 @@ export class GameCore {
         if (this.isGameOver) return;
         
         const fen = createFEN(this.board, this.turn, this.castleRights, this.enPassantTarget, Math.floor(this.history.length / 2) + 1, this.history.length + 1);
+        await this.configureEngineStrength();
         
         // Mock engine call or use IPC if available
         let bestMove = null;
-            if ((window as any).api && (window as any).api.getBestMove) {
-                 // Calculate think time based on difficulty (use reasonable seconds -> convert to ms)
-                 let thinkSeconds = 1; // default seconds
-                 switch(this.diff) {
-                     case 1: thinkSeconds = Math.random() * 0.5 + 0.5; break;   // 0.5 - 1.0s
-                     case 2: thinkSeconds = Math.random() * 1.0 + 1.0; break;   // 1.0 - 2.0s
-                     case 3: thinkSeconds = Math.random() * 2.0 + 2.0; break;   // 2.0 - 4.0s
-                     case 4: thinkSeconds = Math.random() * 4.0 + 4.0; break;   // 4.0 - 8.0s
-                     case 5: thinkSeconds = Math.random() * 6.0 + 6.0; break;   // 6.0 - 12.0s
-                     default: thinkSeconds = 8.0; break;  // 3.0 - 8.0s
-                 }
+            if ((window as any).api && (window as any).api.getBestMove) 
+                {
+                    const thinkTime = 1500-Math.floor(Math.random()*(5-this.diff)*100); 
 
-                 // Convert to milliseconds and ensure a minimum of 200 ms
-                 const thinkTime = Math.min(Math.max(200, Math.round(thinkSeconds * 300)),2500);
+                    console.log('computerMove: diff=', this.diff, 'thinkTime(ms)=', thinkTime);
 
-                 console.log('computerMove: diff=', this.diff, 'thinkSeconds=', thinkSeconds, 'thinkTime(ms)=', thinkTime);
+                    try {
+                        const api = (window as any).api;
+                        const callPromise = api.getBestMove(fen, thinkTime);
+                        // Protect against engine hanging by racing with a timeout (thinkTime + 5s buffer)
+                        const timeoutMs = thinkTime + 5000;
+                        const result = await Promise.race([
+                            callPromise,
+                            new Promise<string | null>((resolve) => setTimeout(() => resolve(null), timeoutMs))
+                        ]);
 
-                 try {
-                    const api = (window as any).api;
-                    const callPromise = api.getBestMove(fen, thinkTime);
-                    // Protect against engine hanging by racing with a timeout (thinkTime + 5s buffer)
-                    const timeoutMs = thinkTime + 5000;
-                    const result = await Promise.race([
-                        callPromise,
-                        new Promise<string | null>((resolve) => setTimeout(() => resolve(null), timeoutMs))
-                    ]);
-
-                    if (!result) {
-                        console.warn('Engine did not respond in time; result=null; falling back to random move');
-                        bestMove = null;
-                    } else {
-                        bestMove = result;
-                    }
-                 } catch (e) {
-                     console.error("Engine error:", e);
-                 }
-        } else {
-            console.warn("Engine API not found, using random move (Mock)");
-            await sleep(500);
-            
-            // Fallback: Find a random valid move
-            const allMoves: {from: {row: number, col: number}, to: {row: number, col: number}, promotion?: string}[] = [];
-            
-            for(let r=0; r<8; r++) {
-                for(let c=0; c<8; c++) {
-                    const piece = this.board[r][c];
-                    if(piece && color(piece) === this.turn) {
-                        const moves = this.getValidMovesForSquare(r, c);
-                        for(const m of moves) {
-                            allMoves.push({
-                                from: {row: r, col: c},
-                                to: {row: m[0], col: m[1]},
-                                promotion: (piece.toUpperCase() === 'P' && (m[0] === 0 || m[0] === 7)) ? 'q' : undefined
-                            });
+                        if (!result) {
+                            console.warn('Engine did not respond in time; result=null; falling back to random move');
+                            bestMove = null;
+                        } else {
+                            bestMove = result;
                         }
+                    } catch (e) {
+                        console.error("Engine error:", e);
                     }
-                }
-            }
-            
-            if(allMoves.length > 0) {
-                const randomMove = allMoves[Math.floor(Math.random() * allMoves.length)];
-                // Convert to UCI for consistency if needed, or just execute
-                if (randomMove) {
-                    await this.executeMove(randomMove.from.row, randomMove.from.col, randomMove.to.row, randomMove.to.col, randomMove.promotion);
-                }
-            } else {
-                console.log("No valid moves for computer (Stalemate/Checkmate should have been caught).");
-            }
+        } else {
+            // If there's no engine API available, do not perform a fallback random move.
+            // This prevents the computer from playing random moves when an engine is not present.
+            console.warn("Engine API not found; computer move skipped (no engine available).");
+            return;
         }
 
         console.log("Computer's best move (UCI): ", bestMove);
@@ -449,6 +412,54 @@ export class GameCore {
             validMoveTo = avoidCheck(validMoveTo, this.board, color(piece), {row, col}, piece);
         }
         return validMoveTo;
+    }
+
+    /** Map difficulty (1-5) to Stockfish UCI_Elo values */
+    private eloFromDiff(diff: number): number {
+        const map = [0, 400, 800, 1300, 1900, 2400];
+        const clamped = Math.max(1, Math.min(5, diff || 1));
+        return map[clamped] ?? 1500;
+    }
+
+    /** Configure engine strength via UCI options if the API supports it */
+    private async configureEngineStrength(): Promise<void> {
+        const api = (window as any).api;
+        if (!api) {
+            console.warn('Engine API not found; cannot configure ELO.');
+            return;
+        }
+
+        const elo = this.eloFromDiff(this.diff);
+        const commands = [
+            { name: 'UCI_LimitStrength', value: true },
+            { name: 'UCI_Elo', value: elo }
+        ];
+
+        try {
+            if (typeof api.setOption === 'function') {
+                // Preferred: structured setOption calls
+                for (const cmd of commands) {
+                    await api.setOption(cmd.name, cmd.value);
+                }
+            } else if (typeof api.sendCommand === 'function') {
+                // Fallback: raw UCI command strings
+                for (const cmd of commands) {
+                    await api.sendCommand(`setoption name ${cmd.name} value ${cmd.value}`);
+                }
+                await api.sendCommand('isready');
+            } else if (typeof api.postMessage === 'function') {
+                // stockfish.js style worker interface (string messages)
+                for (const cmd of commands) {
+                    api.postMessage(`setoption name ${cmd.name} value ${cmd.value}`);
+                }
+                api.postMessage('isready');
+            } else {
+                console.warn('Engine API does not expose setOption/sendCommand/postMessage; skipping ELO config.');
+            }
+            console.log(`Engine strength configured: diff=${this.diff}, UCI_Elo=${elo}`);
+        } catch (err) {
+            console.error('Failed to configure engine strength (ELO):', err);
+        }
     }
 }
 
