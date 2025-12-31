@@ -15,16 +15,24 @@
         <span>{{ diff }}</span>
       </div>
       <div class="form-group" v-if="mode === 'PvC'">
-        <label>Side:</label>
+        <label>Side: </label>
         <select v-model="sideOption">
           <option value="Random">Random</option>
           <option value="White">White</option>
           <option value="Black">Black</option>
         </select>
       </div>
+      <div class="form-group time-controller" v-if="mode === 'PvP'">
+        <label>Time: </label>
+        <select v-model="timeOption">
+          <option value="1">1 Minute</option>
+          <option value="5">5 Minutes</option>
+          <option value="10">10 Minutes</option>
+          <option value="15">30 Minutes</option>
+        </select>
+      </div>
       <button @click="startGame" class="start-btn">Start Game</button>
     </div>
-
     <div v-else class="game-container">
       <div class="sidebar left">
         <div class="status-panel">
@@ -47,6 +55,11 @@
       </div>
 
       <div class="sidebar right">
+        <div v-if="mode === 'PvP'" class = "time-count">
+          <h3>Time Left</h3>
+          <div>White: {{whiteTime}}</div>
+          <div>Black: {{blackTime}}</div>
+        </div>
         <div class="history-panel">
           <h3>History</h3>
           <ul class="history-list" ref="historyList">
@@ -72,15 +85,62 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, watch, onUnmounted } from 'vue';
 import ChessBoard from './components/ChessBoard.vue';
 import { gameCore, type GameState, type GameMode, type TurnType } from './game-core';
+import { startTimer, stopTimer, switchTurn, returnTime_White, returnTime_Black, getRemainingTime_White, getRemainingTime_Black } from './utils/timer.ts';
 
 const mode = ref<GameMode>('PvC');
 const diff = ref(3);
 const sideOption = ref<TurnType | 'Random'>('Random');
 const actualPlayerSide = ref<TurnType>('White');
 const started = ref(false);
+const timeOption = ref(10);
+let whiteTime = ref('10:00');
+let blackTime = ref('10:00');
+
+// Clock poll management
+let clockPollId: number | null = null;
+const POLL_MS = 200;
+function updateClockOnce() {
+  try {
+    whiteTime.value = returnTime_White();
+    blackTime.value = returnTime_Black();
+    // detect timeout (ms <= 0) and notify gameCore
+    try {
+      const wMs = getRemainingTime_White();
+      const bMs = getRemainingTime_Black();
+      if (mode.value === 'PvP' && !state.value.isGameOver) {
+        if (wMs != null && wMs <= 0) {
+          stopClockPoll();
+          try { stopTimer(); } catch {}
+          gameCore.handleTimeout('White');
+        } else if (bMs != null && bMs <= 0) {
+          stopClockPoll();
+          try { stopTimer(); } catch {}
+          gameCore.handleTimeout('Black');
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  } catch (e) {
+    // ignore if timer API unavailable
+  }
+}
+
+function startClockPoll() {
+  stopClockPoll();
+  updateClockOnce();
+  clockPollId = window.setInterval(updateClockOnce, POLL_MS);
+}
+
+function stopClockPoll() {
+  if (clockPollId != null) {
+    clearInterval(clockPollId);
+    clockPollId = null;
+  }
+}
 
 const state = ref<GameState>({
   board: [],
@@ -112,8 +172,10 @@ function startGame() {
   started.value = true;
   selectedSquare.value = null;
   possibleMoves.value = [];
+  whiteTime.value = timeOption.value + ':00';
+  blackTime.value = timeOption.value + ':00';
   
-  let side: TurnType | 'Random' = 'Random'; 
+  let side: TurnType | 'Random' = 'Random';
   if (sideOption.value === 'Random') {
     side = Math.random() < 0.5 ? 'White' : 'Black';
   } else {
@@ -122,6 +184,10 @@ function startGame() {
   actualPlayerSide.value = side;
 
   gameCore.start({ mode: mode.value, diff: diff.value, playerSide: side });
+  if (mode.value === 'PvP') {
+    startTimer(timeOption.value, side);
+    startClockPoll();
+  }
 }
 
 function restartGame() {
@@ -144,6 +210,35 @@ function restartGame() {
   // Short debounce to avoid double clicks; session token in gameCore also prevents stale AI runs
   setTimeout(() => { isRestarting.value = false; }, 800);
 }
+
+// Watchers to manage clock lifecycle and turn switching
+watch(started, (val) => {
+  if (!val) {
+    stopClockPoll();
+    try { stopTimer(); } catch {}
+  }
+});
+
+// When history length increases, assume a move was made -> switch timer turn
+watch(() => state.value.history.length, (n, o) => {
+  if (n > o) {
+    try { switchTurn(); } catch {}
+    updateClockOnce();
+  }
+});
+
+// Stop clocks when game ends
+watch(() => state.value.isGameOver, (v) => {
+  if (v) {
+    stopClockPoll();
+    try { stopTimer(); } catch {}
+  }
+});
+
+onUnmounted(() => {
+  stopClockPoll();
+  try { stopTimer(); } catch {}
+});
 
 async function onSquareClick(row: number, col: number) {
   if (state.value.isGameOver || state.value.promotionPending) return;
@@ -216,6 +311,9 @@ body {
 
 .sidebar {
   width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .status-panel {
@@ -227,12 +325,23 @@ body {
 
 .history-panel {
   background: #3f5d7b;
-  padding: 1rem;
-  border-radius: 8px;
-  height: 480px;
+  padding: 0.7rem 1rem;
+  border-radius: 4px;
+  margin-top: 2px;
+  height: 360px;
   display: flex;
   flex-direction: column;
 }
+
+.time-count {
+  background-color: #7f8c8d;
+  padding: 0.5rem 0.9rem;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  margin-top: 4px;
+  text-align: left;
+}
+.time-count h3{ margin: 2px 0 6px 4px; font-size: 0.95rem; }
 
 .history-list {
   list-style: none;
@@ -243,6 +352,7 @@ body {
   text-align: left;
   font-family: monospace;
 }
+.history-list h3{ margin-top: 0;}
 
 .modal-overlay {
   position: fixed;

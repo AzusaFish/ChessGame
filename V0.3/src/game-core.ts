@@ -165,6 +165,59 @@ export class GameCore {
         }
     }
 
+    // Check if material is insufficient for mate (very conservative check)
+    private isInsufficientMaterialForMate(): boolean {
+        // Collect non-king, non-pawn pieces
+        const pieces: string[] = [];
+        for (const row of this.board) {
+            for (const p of row) {
+                if (!p) continue;
+                const t = p.toLowerCase();
+                if (t === 'k' || t === 'p') continue;
+                pieces.push(t);
+            }
+        }
+        if (pieces.length === 0) return true; // K vs K
+        if (pieces.length === 1) {
+            // single minor piece only (knight or bishop) -> insufficient
+            const only = pieces[0];
+            if (only === 'n' || only === 'b') return true;
+        }
+        return false;
+    }
+
+    // Handle timeout for a side. Called when a timer reaches zero.
+    handleTimeout(loser: TurnType) {
+        if (this.isGameOver) return;
+        const winner: TurnType = (loser === 'White') ? 'Black' : 'White';
+
+        // Stop any engine thinking (best-effort)
+        try {
+            const api = (window as any).api;
+            if (api) {
+                if (typeof api.stop === 'function') api.stop();
+                else if (typeof api.sendCommand === 'function') api.sendCommand('stop');
+                else if (typeof api.postMessage === 'function') api.postMessage('stop');
+            }
+        } catch (e) {
+            console.warn('Failed to stop engine on timeout:', e);
+        }
+
+        // If opponent has insufficient material to mate, declare draw
+        if (this.isInsufficientMaterialForMate()) {
+            const idx = this.history.length + 1;
+            this.history.push(`${idx}. Draw by insufficient material`);
+            this.isGameOver = true;
+            this.emitUpdate();
+            return;
+        }
+
+        // Otherwise, record timeout defeat
+        this.addHistoryRecord(-1, -1, -1, -1, 'Time Out');
+        this.isGameOver = true;
+        this.emitUpdate();
+    }
+
     addHistoryRecord(fromRow: number, fromCol: number, toRow: number, toCol: number, piece: string, promoteChoice: string | null = null) {
         const historyLength = this.history.length + 1;
         if (piece === "O-O" || piece === "O-O-O") {
@@ -183,7 +236,10 @@ export class GameCore {
             this.history.push(`${historyLength}. Draw by Threefold repetition`);
             return;
         }
-
+        if (piece === "Time Out") {
+            this.history.push(`${historyLength}. Time Out - Game Over`);
+            return;
+        }
         const from = getAlgebraicNotation(fromRow, fromCol);
         const to = getAlgebraicNotation(toRow, toCol);
         const pieceSymbol = piece.toUpperCase() === 'P' ? '' : piece.toUpperCase();

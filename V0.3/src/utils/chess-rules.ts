@@ -332,10 +332,10 @@ export function avoidCheck(validMoveTo: any[], Board: (string | null)[][], who: 
 
         let tempBoard = JSON.parse(JSON.stringify(Board));
         if (tempBoard[move[0]]) {
-             tempBoard[move[0]][move[1]] = movingPiece;
+            tempBoard[move[0]][move[1]] = movingPiece;
         }
         if (tempBoard[selectedSquare.row]) {
-             tempBoard[selectedSquare.row][selectedSquare.col] = null;
+            tempBoard[selectedSquare.row][selectedSquare.col] = null;
         }
 
         if (move.length > 2 && move[2] === 'enPassant') {
