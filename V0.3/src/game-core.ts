@@ -127,7 +127,7 @@ export class GameCore {
         
         // Randomize side if not specified and PvC
         if (this.mode === 'PvC' && !options.playerSide) {
-            this.playerSide = Math.random() < 0.5 ? 'White' : 'Black';
+            this.playerSide = (crypto.getRandomValues(new Uint32Array(1))[0]! / 4294967296) < 0.5 ? 'White' : 'Black';
         }
 
         this.reset();
@@ -264,7 +264,7 @@ export class GameCore {
         let bestMove = null;
             if ((window as any).api && (window as any).api.getBestMove) 
                 {
-                    const thinkTime = 1500-Math.floor(Math.random()*(5-this.diff)*100); 
+                    const thinkTime = 1500 - Math.floor((crypto.getRandomValues(new Uint32Array(1))[0]! / 4294967296) * (5 - this.diff) * 100);
 
                     console.log('computerMove: diff=', this.diff, 'thinkTime(ms)=', thinkTime);
 

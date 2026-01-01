@@ -177,7 +177,7 @@ function startGame() {
   
   let side: TurnType | 'Random' = 'Random';
   if (sideOption.value === 'Random') {
-    side = Math.random() < 0.5 ? 'White' : 'Black';
+    side = (crypto.getRandomValues(new Uint32Array(1))[0]! / 4294967296) < 0.5 ? 'White' : 'Black';
   } else {
     side = sideOption.value as TurnType;
   }
@@ -199,7 +199,7 @@ function restartGame() {
 
   let side: TurnType = 'White';
   if (sideOption.value === 'Random') {
-    side = Math.random() < 0.5 ? 'White' : 'Black';
+    side = (crypto.getRandomValues(new Uint32Array(1))[0]! / 4294967296) < 0.5 ? 'White' : 'Black';
   } else {
     side = sideOption.value as TurnType;
   }
